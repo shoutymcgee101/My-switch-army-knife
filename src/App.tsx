@@ -6,8 +6,8 @@ import { CheckSquare, Square, Plus, Trash2, StickyNote, Wallet, ListChecks } fro
 // Replace these two values with your own Project URL and anon public key
 // from Supabase → Settings → API. Do not commit real secrets to a public repo;
 // for a private repo this is fine, otherwise use environment variables.
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://phpwaqyosfjwlnxtlcuv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_qKn8vUztl5cGDWB24b8_xA_nkDShm_r";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const ROW_ID = "main"; // single shared row holding all your data
 
