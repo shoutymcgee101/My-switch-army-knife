@@ -1,361 +1,765 @@
-diff --git a/src/App.jsx b/src/App.jsx
-index 9113928..4c2e9b1 100644
---- a/src/App.jsx
-+++ b/src/App.jsx
-@@ -1,6 +1,6 @@
- import React, { useState, useEffect, useRef, useCallback } from "react";
- import { createClient } from "@supabase/supabase-js";
--import { CheckSquare, Square, Plus, Trash2, StickyNote, Wallet, ListChecks } from "lucide-react";
-+import { CheckSquare, Square, Plus, Trash2, StickyNote, Wallet, ListChecks, Shirt, Filter } from "lucide-react";
- 
- // ---- Supabase setup ----
- // Replace these two values with your own Project URL and anon public key
-@@ -19,6 +19,8 @@ const GREEN = "#2E5A48";
- const GREEN_DIM = "#5C7F70";
- const RUST = "#A8462F";
- 
-+const CLOTHES_CATEGORIES = ["Shirt", "Pants", "Shoes", "Jacket", "Outerwear", "Dress", "Accessories", "Other"];
-+
- const uid = () => Math.random().toString(36).slice(2, 10);
- 
- const todayStamp = () => {
-@@ -27,7 +29,7 @@ const todayStamp = () => {
- };
- 
- function useLedgerData() {
--  const [data, setData] = useState({ tasks: [], notes: [], budget: [] });
-+  const [data, setData] = useState({ tasks: [], notes: [], budget: [], clothes: [] });
-   const [status, setStatus] = useState("loading"); // loading | ready | saving | error
-   const saveTimer = useRef(null);
- 
-@@ -47,6 +49,7 @@ function useLedgerData() {
-           tasks: row.data.tasks || [],
-           notes: row.data.notes || [],
-           budget: row.data.budget || [],
-+          clothes: row.data.clothes || [],
-         });
-       }
-       setStatus("ready");
-@@ -303,6 +306,298 @@ function BudgetTab({ budget, setBudget }) {
-   );
- }
- 
-+function ClothesTab({ clothes, setClothes }) {
-+  const [name, setName] = useState("");
-+  const [brand, setBrand] = useState("");
-+  const [category, setCategory] = useState(CLOTHES_CATEGORIES[0]);
-+  const [listingPrice, setListingPrice] = useState("");
-+  const [retailPrice, setRetailPrice] = useState("");
-+  const [notes, setNotes] = useState("");
-+
-+  const [showFilter, setShowFilter] = useState(false);
-+  const [filterCategory, setFilterCategory] = useState("All");
-+  const [filterStatus, setFilterStatus] = useState("All");
-+
-+  const add = () => {
-+    const v = name.trim();
-+    if (!v) return;
-+    setClothes([
-+      {
-+        id: uid(),
-+        name: v,
-+        brand: brand.trim(),
-+        category,
-+        listingPrice: listingPrice === "" ? null : parseFloat(listingPrice),
-+        retailPrice: retailPrice === "" ? null : parseFloat(retailPrice),
-+        notes: notes.trim(),
-+        sold: false,
-+        ts: Date.now(),
-+      },
-+      ...clothes,
-+    ]);
-+    setName("");
-+    setBrand("");
-+    setListingPrice("");
-+    setRetailPrice("");
-+    setNotes("");
-+  };
-+
-+  const remove = (id) => setClothes(clothes.filter((c) => c.id !== id));
-+  const toggleSold = (id) => setClothes(clothes.map((c) => (c.id === id ? { ...c, sold: !c.sold } : c)));
-+
-+  const filtered = clothes.filter((c) => {
-+    const categoryMatch = filterCategory === "All" || c.category === filterCategory;
-+    const statusMatch = filterStatus === "All" || (filterStatus === "Sold" ? c.sold : !c.sold);
-+    return categoryMatch && statusMatch;
-+  });
-+
-+  const activeFilterCount = (filterCategory !== "All" ? 1 : 0) + (filterStatus !== "All" ? 1 : 0);
-+
-+  return (
-+    <div>
-+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-+        <button
-+          onClick={() => setShowFilter((s) => !s)}
-+          style={{
-+            display: "flex",
-+            alignItems: "center",
-+            gap: 6,
-+            border: `1px solid ${PAPER_LINE}`,
-+            background: showFilter || activeFilterCount > 0 ? INK : "transparent",
-+            color: showFilter || activeFilterCount > 0 ? PAPER : INK_FAINT,
-+            padding: "7px 12px",
-+            cursor: "pointer",
-+            fontFamily: "ui-monospace, monospace",
-+            fontSize: 12,
-+            letterSpacing: "0.03em",
-+            borderRadius: 2,
-+          }}
-+        >
-+          <Filter size={13} />
-+          Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-+        </button>
-+      </div>
-+
-+      {showFilter && (
-+        <div style={{ border: `1px solid ${PAPER_LINE}`, background: "#FFFEFB", padding: 14, marginBottom: 18 }}>
-+          <div style={{ marginBottom: 10 }}>
-+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, letterSpacing: "0.08em", color: INK_FAINT, marginBottom: 6 }}>
-+              CATEGORY
-+            </div>
-+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-+              {["All", ...CLOTHES_CATEGORIES].map((cat) => (
-+                <button
-+                  key={cat}
-+                  onClick={() => setFilterCategory(cat)}
-+                  style={{
-+                    border: `1px solid ${PAPER_LINE}`,
-+                    background: filterCategory === cat ? GREEN : "transparent",
-+                    color: filterCategory === cat ? "#fff" : INK_FAINT,
-+                    padding: "5px 10px",
-+                    cursor: "pointer",
-+                    fontFamily: "ui-monospace, monospace",
-+                    fontSize: 11,
-+                    borderRadius: 2,
-+                  }}
-+                >
-+                  {cat}
-+                </button>
-+              ))}
-+            </div>
-+          </div>
-+          <div>
-+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, letterSpacing: "0.08em", color: INK_FAINT, marginBottom: 6 }}>
-+              STATUS
-+            </div>
-+            <div style={{ display: "flex", gap: 6 }}>
-+              {["All", "Active", "Sold"].map((s) => (
-+                <button
-+                  key={s}
-+                  onClick={() => setFilterStatus(s)}
-+                  style={{
-+                    border: `1px solid ${PAPER_LINE}`,
-+                    background: filterStatus === s ? GREEN : "transparent",
-+                    color: filterStatus === s ? "#fff" : INK_FAINT,
-+                    padding: "5px 10px",
-+                    cursor: "pointer",
-+                    fontFamily: "ui-monospace, monospace",
-+                    fontSize: 11,
-+                    borderRadius: 2,
-+                  }}
-+                >
-+                  {s}
-+                </button>
-+              ))}
-+            </div>
-+          </div>
-+          {activeFilterCount > 0 && (
-+            <button
-+              onClick={() => {
-+                setFilterCategory("All");
-+                setFilterStatus("All");
-+              }}
-+              style={{
-+                marginTop: 12,
-+                background: "none",
-+                border: "none",
-+                color: RUST,
-+                cursor: "pointer",
-+                fontFamily: "ui-monospace, monospace",
-+                fontSize: 11,
-+                padding: 0,
-+              }}
-+            >
-+              Clear filters
-+            </button>
-+          )}
-+        </div>
-+      )}
-+
-+      <div style={{ marginBottom: 20, border: `1px solid ${PAPER_LINE}`, padding: 14, background: "#FFFEFB" }}>
-+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name…" style={{ ...inputStyle, flex: 2 }} />
-+          <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Brand…" style={{ ...inputStyle, flex: 1 }} />
-+        </div>
-+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
-+            {CLOTHES_CATEGORIES.map((c) => (
-+              <option key={c} value={c}>
-+                {c}
-+              </option>
-+            ))}
-+          </select>
-+          <input
-+            value={listingPrice}
-+            onChange={(e) => setListingPrice(e.target.value)}
-+            placeholder="Listing $"
-+            inputMode="decimal"
-+            style={{ ...inputStyle, flex: 1 }}
-+          />
-+          <input
-+            value={retailPrice}
-+            onChange={(e) => setRetailPrice(e.target.value)}
-+            placeholder="Retail $"
-+            inputMode="decimal"
-+            style={{ ...inputStyle, flex: 1 }}
-+          />
-+        </div>
-+        <textarea
-+          value={notes}
-+          onChange={(e) => setNotes(e.target.value)}
-+          placeholder="Notes…"
-+          rows={2}
-+          style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "Georgia, serif", marginBottom: 8 }}
-+        />
-+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-+          <button onClick={add} style={{ ...addBtnStyle, width: "auto", padding: "8px 16px" }}>
-+            Add item
-+          </button>
-+        </div>
-+      </div>
-+
-+      {filtered.length === 0 && (
-+        <EmptyRow>
-+          {clothes.length === 0 ? "No clothes logged yet. Add your first item above." : "Nothing matches the current filter."}
-+        </EmptyRow>
-+      )}
-+
-+      {filtered.map((c) => (
-+        <ClothesRow key={c.id} item={c} onDelete={() => remove(c.id)} onToggleSold={() => toggleSold(c.id)} />
-+      ))}
-+    </div>
-+  );
-+}
-+
-+function ClothesRow({ item, onDelete, onToggleSold }) {
-+  const [hover, setHover] = useState(false);
-+  return (
-+    <div
-+      onMouseEnter={() => setHover(true)}
-+      onMouseLeave={() => setHover(false)}
-+      style={{ padding: "13px 4px", borderBottom: `1px solid ${PAPER_LINE}`, opacity: item.sold ? 0.55 : 1 }}
-+    >
-+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-+        <div style={{ flex: 1 }}>
-+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-+            <span style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK, textDecoration: item.sold ? "line-through" : "none" }}>
-+              {item.name}
-+            </span>
-+            {item.brand && <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11, color: INK_FAINT }}>— {item.brand}</span>}
-+            <span
-+              style={{
-+                fontFamily: "ui-monospace, monospace",
-+                fontSize: 10,
-+                letterSpacing: "0.05em",
-+                color: GREEN_DIM,
-+                border: `1px solid ${PAPER_LINE}`,
-+                padding: "1px 6px",
-+                borderRadius: 2,
-+              }}
-+            >
-+              {item.category.toUpperCase()}
-+            </span>
-+            {item.sold && (
-+              <span
-+                style={{
-+                  fontFamily: "ui-monospace, monospace",
-+                  fontSize: 10,
-+                  letterSpacing: "0.05em",
-+                  color: RUST,
-+                  border: `1px solid ${RUST}`,
-+                  padding: "1px 6px",
-+                  borderRadius: 2,
-+                }}
-+              >
-+                SOLD
-+              </span>
-+            )}
-+          </div>
-+
-+          <div style={{ display: "flex", gap: 14, marginTop: 6, fontFamily: "ui-monospace, monospace", fontSize: 12.5, color: INK_FAINT }}>
-+            {item.listingPrice != null && !isNaN(item.listingPrice) && <span>Listing: ${item.listingPrice.toFixed(2)}</span>}
-+            {item.retailPrice != null && !isNaN(item.retailPrice) && <span>Retail: ${item.retailPrice.toFixed(2)}</span>}
-+          </div>
-+
-+          {item.notes && (
-+            <div style={{ fontFamily: "Georgia, serif", fontSize: 13, color: INK_FAINT, fontStyle: "italic", marginTop: 6, whiteSpace: "pre-wrap" }}>
-+              {item.notes}
-+            </div>
-+          )}
-+        </div>
-+
-+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-+          <button
-+            onClick={onToggleSold}
-+            style={{
-+              display: "flex",
-+              alignItems: "center",
-+              gap: 4,
-+              border: `1px solid ${item.sold ? GREEN : PAPER_LINE}`,
-+              background: item.sold ? GREEN : "transparent",
-+              color: item.sold ? "#fff" : INK_FAINT,
-+              padding: "5px 10px",
-+              cursor: "pointer",
-+              fontFamily: "ui-monospace, monospace",
-+              fontSize: 11,
-+              borderRadius: 2,
-+            }}
-+          >
-+            {item.sold ? <CheckSquare size={12} /> : <Square size={12} />}
-+            {item.sold ? "Sold" : "Mark sold"}
-+          </button>
-+          <button
-+            onClick={onDelete}
-+            aria-label="Delete"
-+            style={{ background: "none", border: "none", cursor: "pointer", opacity: hover ? 1 : 0.25, transition: "opacity 0.15s", padding: 4 }}
-+          >
-+            <Trash2 size={14} color={INK_FAINT} />
-+          </button>
-+        </div>
-+      </div>
-+    </div>
-+  );
-+}
-+
- function Row({ children, onDelete, align = "center" }) {
-   const [hover, setHover] = useState(false);
-   return (
-@@ -385,6 +680,7 @@ const TABS = [
-   { key: "tasks", label: "Tasks", icon: ListChecks },
-   { key: "notes", label: "Notes", icon: StickyNote },
-   { key: "budget", label: "Budget", icon: Wallet },
-+  { key: "clothes", label: "Clothes", icon: Shirt },
- ];
- 
- export default function App() {
-@@ -394,6 +690,7 @@ export default function App() {
-   const setTasks = (tasks) => persist({ ...data, tasks });
-   const setNotes = (notes) => persist({ ...data, notes });
-   const setBudget = (budget) => persist({ ...data, budget });
-+  const setClothes = (clothes) => persist({ ...data, clothes });
- 
-   return (
-     <div
-@@ -455,6 +752,7 @@ export default function App() {
-             {tab === "tasks" && <TasksTab tasks={data.tasks} setTasks={setTasks} />}
-             {tab === "notes" && <NotesTab notes={data.notes} setNotes={setNotes} />}
-             {tab === "budget" && <BudgetTab budget={data.budget} setBudget={setBudget} />}
-+            {tab === "clothes" && <ClothesTab clothes={data.clothes} setClothes={setClothes} />}
-           </>
-         )}
- 
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { CheckSquare, Square, Plus, Trash2, StickyNote, Wallet, ListChecks, Shirt, Filter } from "lucide-react";
+
+// ---- Supabase setup ----
+// Replace these two values with your own Project URL and anon public key
+// from Supabase → Settings → API. Do not commit real secrets to a public repo;
+// for a private repo this is fine, otherwise use environment variables.
+const SUPABASE_URL = "https://phpwaqyosfjwlnxtlcuv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_qKn8vUztl5cGDWB24b8_xA_nkDShm_r";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ROW_ID = "main"; // single shared row holding all your data
+
+const PAPER = "#F6F3EA";
+const PAPER_LINE = "#DCD5C1";
+const INK = "#2A2620";
+const INK_FAINT = "#8A8270";
+const GREEN = "#2E5A48";
+const GREEN_DIM = "#5C7F70";
+const RUST = "#A8462F";
+
+const CLOTHES_CATEGORIES = ["Shirt", "Pants", "Shoes", "Jacket", "Outerwear", "Dress", "Accessories", "Other"];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+const todayStamp = () => {
+  const d = new Date();
+  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase();
+};
+
+function useLedgerData() {
+  const [data, setData] = useState({ tasks: [], notes: [], budget: [], clothes: [] });
+  const [status, setStatus] = useState("loading"); // loading | ready | saving | error
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: row, error } = await supabase
+        .from("ledger")
+        .select("data")
+        .eq("id", ROW_ID)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (!error && row && row.data) {
+        setData({
+          tasks: row.data.tasks || [],
+          notes: row.data.notes || [],
+          budget: row.data.budget || [],
+          clothes: row.data.clothes || [],
+        });
+      }
+      setStatus("ready");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const persist = useCallback((next) => {
+    setData(next);
+    setStatus("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const { error } = await supabase
+        .from("ledger")
+        .upsert({ id: ROW_ID, data: next, updated_at: new Date().toISOString() });
+      setStatus(error ? "error" : "ready");
+    }, 350);
+  }, []);
+
+  return { data, status, persist };
+}
+
+function Stamp() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 18,
+        right: 22,
+        border: `2px solid ${RUST}`,
+        color: RUST,
+        padding: "4px 10px",
+        borderRadius: 3,
+        fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+        fontSize: 11,
+        letterSpacing: "0.08em",
+        transform: "rotate(4deg)",
+        opacity: 0.75,
+        userSelect: "none",
+      }}
+    >
+      {todayStamp()}
+    </div>
+  );
+}
+
+function SyncDot({ status }) {
+  const color = status === "ready" ? GREEN : status === "saving" ? "#C9A227" : status === "error" ? RUST : INK_FAINT;
+  const label = status === "ready" ? "synced" : status === "saving" ? "saving…" : status === "error" ? "offline — retry" : "loading…";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "ui-monospace, monospace", fontSize: 11, color: INK_FAINT, letterSpacing: "0.04em" }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
+      {label}
+    </div>
+  );
+}
+
+function EmptyRow({ children }) {
+  return (
+    <div style={{ padding: "28px 4px", color: INK_FAINT, fontFamily: "Georgia, 'Iowan Old Style', serif", fontStyle: "italic", fontSize: 14, borderBottom: `1px solid ${PAPER_LINE}` }}>
+      {children}
+    </div>
+  );
+}
+
+function TasksTab({ tasks, setTasks }) {
+  const [text, setText] = useState("");
+  const add = () => {
+    const v = text.trim();
+    if (!v) return;
+    setTasks([{ id: uid(), text: v, done: false, ts: Date.now() }, ...tasks]);
+    setText("");
+  };
+  const toggle = (id) => setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const remove = (id) => setTasks(tasks.filter((t) => t.id !== id));
+
+  const open = tasks.filter((t) => !t.done);
+  const done = tasks.filter((t) => t.done);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Add a task…"
+          style={inputStyle}
+        />
+        <button onClick={add} style={addBtnStyle} aria-label="Add task">
+          <Plus size={16} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {open.length === 0 && done.length === 0 && <EmptyRow>Nothing on the list. Add your first task above.</EmptyRow>}
+
+      {open.map((t) => (
+        <Row key={t.id} onDelete={() => remove(t.id)}>
+          <button onClick={() => toggle(t.id)} style={checkBtnStyle} aria-label="Mark done">
+            <Square size={17} color={INK_FAINT} strokeWidth={1.6} />
+          </button>
+          <span style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK }}>{t.text}</span>
+        </Row>
+      ))}
+
+      {done.length > 0 && (
+        <div style={{ marginTop: 22, marginBottom: 8, fontFamily: "ui-monospace, monospace", fontSize: 11, letterSpacing: "0.1em", color: INK_FAINT }}>
+          DONE — {done.length}
+        </div>
+      )}
+      {done.map((t) => (
+        <Row key={t.id} onDelete={() => remove(t.id)}>
+          <button onClick={() => toggle(t.id)} style={checkBtnStyle} aria-label="Mark not done">
+            <CheckSquare size={17} color={GREEN} strokeWidth={1.8} />
+          </button>
+          <span style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK_FAINT, textDecoration: "line-through" }}>{t.text}</span>
+        </Row>
+      ))}
+    </div>
+  );
+}
+
+function NotesTab({ notes, setNotes }) {
+  const [text, setText] = useState("");
+  const add = () => {
+    const v = text.trim();
+    if (!v) return;
+    setNotes([{ id: uid(), text: v, ts: Date.now() }, ...notes]);
+    setText("");
+  };
+  const remove = (id) => setNotes(notes.filter((n) => n.id !== id));
+
+  return (
+    <div>
+      <div style={{ marginBottom: 18 }}>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Jot something down…"
+          rows={2}
+          style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "Georgia, serif" }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+          <button onClick={add} style={{ ...addBtnStyle, width: "auto", padding: "8px 16px" }}>
+            Add note
+          </button>
+        </div>
+      </div>
+
+      {notes.length === 0 && <EmptyRow>No notes yet. Whatever's on your mind goes here.</EmptyRow>}
+
+      {notes.map((n) => (
+        <Row key={n.id} onDelete={() => remove(n.id)} align="flex-start">
+          <StickyNote size={16} color={GREEN_DIM} style={{ marginTop: 3, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{n.text}</div>
+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, color: INK_FAINT, marginTop: 4, letterSpacing: "0.03em" }}>
+              {new Date(n.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </div>
+          </div>
+        </Row>
+      ))}
+    </div>
+  );
+}
+
+function BudgetTab({ budget, setBudget }) {
+  const [desc, setDesc] = useState("");
+  const [amt, setAmt] = useState("");
+  const [kind, setKind] = useState("out"); // out | in
+
+  const add = () => {
+    const v = desc.trim();
+    const n = parseFloat(amt);
+    if (!v || isNaN(n)) return;
+    setBudget([{ id: uid(), desc: v, amount: kind === "out" ? -Math.abs(n) : Math.abs(n), ts: Date.now() }, ...budget]);
+    setDesc("");
+    setAmt("");
+  };
+  const remove = (id) => setBudget(budget.filter((b) => b.id !== id));
+  const total = budget.reduce((s, b) => s + b.amount, 0);
+
+  return (
+    <div>
+      <div
+        style={{
+          border: `2px solid ${INK}`,
+          padding: "14px 16px",
+          marginBottom: 20,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          background: total >= 0 ? "rgba(46,90,72,0.06)" : "rgba(168,70,47,0.06)",
+        }}
+      >
+        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11, letterSpacing: "0.1em", color: INK_FAINT }}>BALANCE</span>
+        <span style={{ fontFamily: "Georgia, serif", fontSize: 26, color: total >= 0 ? GREEN : RUST, fontWeight: "bold" }}>
+          {total < 0 ? "−" : ""}${Math.abs(total).toFixed(2)}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description…" style={{ ...inputStyle, flex: 2 }} />
+        <input
+          value={amt}
+          onChange={(e) => setAmt(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="0.00"
+          inputMode="decimal"
+          style={{ ...inputStyle, flex: 1 }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <div style={{ display: "flex", border: `1px solid ${PAPER_LINE}`, flex: 1 }}>
+          <button
+            onClick={() => setKind("out")}
+            style={{ ...toggleBtnStyle, background: kind === "out" ? RUST : "transparent", color: kind === "out" ? "#fff" : INK_FAINT }}
+          >
+            Spent
+          </button>
+          <button
+            onClick={() => setKind("in")}
+            style={{ ...toggleBtnStyle, background: kind === "in" ? GREEN : "transparent", color: kind === "in" ? "#fff" : INK_FAINT }}
+          >
+            Received
+          </button>
+        </div>
+        <button onClick={add} style={{ ...addBtnStyle, width: 48 }} aria-label="Add entry">
+          <Plus size={16} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {budget.length === 0 && <EmptyRow>No entries yet. Log what comes in and goes out.</EmptyRow>}
+
+      {budget.map((b) => (
+        <Row key={b.id} onDelete={() => remove(b.id)}>
+          <span style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK, flex: 1 }}>{b.desc}</span>
+          <span
+            style={{
+              fontFamily: "ui-monospace, monospace",
+              fontSize: 14,
+              color: b.amount < 0 ? RUST : GREEN,
+              minWidth: 80,
+              textAlign: "right",
+            }}
+          >
+            {b.amount < 0 ? "−" : "+"}${Math.abs(b.amount).toFixed(2)}
+          </span>
+        </Row>
+      ))}
+    </div>
+  );
+}
+
+function ClothesTab({ clothes, setClothes }) {
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState(CLOTHES_CATEGORIES[0]);
+  const [listingPrice, setListingPrice] = useState("");
+  const [retailPrice, setRetailPrice] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("All");
+
+  const add = () => {
+    const v = name.trim();
+    if (!v) return;
+    setClothes([
+      {
+        id: uid(),
+        name: v,
+        brand: brand.trim(),
+        category,
+        listingPrice: listingPrice === "" ? null : parseFloat(listingPrice),
+        retailPrice: retailPrice === "" ? null : parseFloat(retailPrice),
+        notes: notes.trim(),
+        sold: false,
+        ts: Date.now(),
+      },
+      ...clothes,
+    ]);
+    setName("");
+    setBrand("");
+    setListingPrice("");
+    setRetailPrice("");
+    setNotes("");
+  };
+
+  const remove = (id) => setClothes(clothes.filter((c) => c.id !== id));
+  const toggleSold = (id) => setClothes(clothes.map((c) => (c.id === id ? { ...c, sold: !c.sold } : c)));
+
+  const filtered = clothes.filter((c) => {
+    const categoryMatch = filterCategory === "All" || c.category === filterCategory;
+    const statusMatch = filterStatus === "All" || (filterStatus === "Sold" ? c.sold : !c.sold);
+    return categoryMatch && statusMatch;
+  });
+
+  const activeFilterCount = (filterCategory !== "All" ? 1 : 0) + (filterStatus !== "All" ? 1 : 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <button
+          onClick={() => setShowFilter((s) => !s)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            border: `1px solid ${PAPER_LINE}`,
+            background: showFilter || activeFilterCount > 0 ? INK : "transparent",
+            color: showFilter || activeFilterCount > 0 ? PAPER : INK_FAINT,
+            padding: "7px 12px",
+            cursor: "pointer",
+            fontFamily: "ui-monospace, monospace",
+            fontSize: 12,
+            letterSpacing: "0.03em",
+            borderRadius: 2,
+          }}
+        >
+          <Filter size={13} />
+          Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+        </button>
+      </div>
+
+      {showFilter && (
+        <div style={{ border: `1px solid ${PAPER_LINE}`, background: "#FFFEFB", padding: 14, marginBottom: 18 }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, letterSpacing: "0.08em", color: INK_FAINT, marginBottom: 6 }}>
+              CATEGORY
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {["All", ...CLOTHES_CATEGORIES].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCategory(cat)}
+                  style={{
+                    border: `1px solid ${PAPER_LINE}`,
+                    background: filterCategory === cat ? GREEN : "transparent",
+                    color: filterCategory === cat ? "#fff" : INK_FAINT,
+                    padding: "5px 10px",
+                    cursor: "pointer",
+                    fontFamily: "ui-monospace, monospace",
+                    fontSize: 11,
+                    borderRadius: 2,
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, letterSpacing: "0.08em", color: INK_FAINT, marginBottom: 6 }}>
+              STATUS
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["All", "Active", "Sold"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  style={{
+                    border: `1px solid ${PAPER_LINE}`,
+                    background: filterStatus === s ? GREEN : "transparent",
+                    color: filterStatus === s ? "#fff" : INK_FAINT,
+                    padding: "5px 10px",
+                    cursor: "pointer",
+                    fontFamily: "ui-monospace, monospace",
+                    fontSize: 11,
+                    borderRadius: 2,
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => {
+                setFilterCategory("All");
+                setFilterStatus("All");
+              }}
+              style={{
+                marginTop: 12,
+                background: "none",
+                border: "none",
+                color: RUST,
+                cursor: "pointer",
+                fontFamily: "ui-monospace, monospace",
+                fontSize: 11,
+                padding: 0,
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 20, border: `1px solid ${PAPER_LINE}`, padding: 14, background: "#FFFEFB" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name…" style={{ ...inputStyle, flex: 2 }} />
+          <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Brand…" style={{ ...inputStyle, flex: 1 }} />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            {CLOTHES_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <input
+            value={listingPrice}
+            onChange={(e) => setListingPrice(e.target.value)}
+            placeholder="Listing $"
+            inputMode="decimal"
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <input
+            value={retailPrice}
+            onChange={(e) => setRetailPrice(e.target.value)}
+            placeholder="Retail $"
+            inputMode="decimal"
+            style={{ ...inputStyle, flex: 1 }}
+          />
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes…"
+          rows={2}
+          style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "Georgia, serif", marginBottom: 8 }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={add} style={{ ...addBtnStyle, width: "auto", padding: "8px 16px" }}>
+            Add item
+          </button>
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <EmptyRow>
+          {clothes.length === 0 ? "No clothes logged yet. Add your first item above." : "Nothing matches the current filter."}
+        </EmptyRow>
+      )}
+
+      {filtered.map((c) => (
+        <ClothesRow key={c.id} item={c} onDelete={() => remove(c.id)} onToggleSold={() => toggleSold(c.id)} />
+      ))}
+    </div>
+  );
+}
+
+function ClothesRow({ item, onDelete, onToggleSold }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: "13px 4px", borderBottom: `1px solid ${PAPER_LINE}`, opacity: item.sold ? 0.55 : 1 }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "Georgia, serif", fontSize: 15, color: INK, textDecoration: item.sold ? "line-through" : "none" }}>
+              {item.name}
+            </span>
+            {item.brand && <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11, color: INK_FAINT }}>— {item.brand}</span>}
+            <span
+              style={{
+                fontFamily: "ui-monospace, monospace",
+                fontSize: 10,
+                letterSpacing: "0.05em",
+                color: GREEN_DIM,
+                border: `1px solid ${PAPER_LINE}`,
+                padding: "1px 6px",
+                borderRadius: 2,
+              }}
+            >
+              {item.category.toUpperCase()}
+            </span>
+            {item.sold && (
+              <span
+                style={{
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 10,
+                  letterSpacing: "0.05em",
+                  color: RUST,
+                  border: `1px solid ${RUST}`,
+                  padding: "1px 6px",
+                  borderRadius: 2,
+                }}
+              >
+                SOLD
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 14, marginTop: 6, fontFamily: "ui-monospace, monospace", fontSize: 12.5, color: INK_FAINT }}>
+            {item.listingPrice != null && !isNaN(item.listingPrice) && <span>Listing: ${item.listingPrice.toFixed(2)}</span>}
+            {item.retailPrice != null && !isNaN(item.retailPrice) && <span>Retail: ${item.retailPrice.toFixed(2)}</span>}
+          </div>
+
+          {item.notes && (
+            <div style={{ fontFamily: "Georgia, serif", fontSize: 13, color: INK_FAINT, fontStyle: "italic", marginTop: 6, whiteSpace: "pre-wrap" }}>
+              {item.notes}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <button
+            onClick={onToggleSold}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              border: `1px solid ${item.sold ? GREEN : PAPER_LINE}`,
+              background: item.sold ? GREEN : "transparent",
+              color: item.sold ? "#fff" : INK_FAINT,
+              padding: "5px 10px",
+              cursor: "pointer",
+              fontFamily: "ui-monospace, monospace",
+              fontSize: 11,
+              borderRadius: 2,
+            }}
+          >
+            {item.sold ? <CheckSquare size={12} /> : <Square size={12} />}
+            {item.sold ? "Sold" : "Mark sold"}
+          </button>
+          <button
+            onClick={onDelete}
+            aria-label="Delete"
+            style={{ background: "none", border: "none", cursor: "pointer", opacity: hover ? 1 : 0.25, transition: "opacity 0.15s", padding: 4 }}
+          >
+            <Trash2 size={14} color={INK_FAINT} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ children, onDelete, align = "center" }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex",
+        alignItems: align,
+        gap: 10,
+        padding: "13px 4px",
+        borderBottom: `1px solid ${PAPER_LINE}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: align, gap: 10, flex: 1 }}>{children}</div>
+      <button
+        onClick={onDelete}
+        aria-label="Delete"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          opacity: hover ? 1 : 0.25,
+          transition: "opacity 0.15s",
+          padding: 4,
+          flexShrink: 0,
+        }}
+      >
+        <Trash2 size={14} color={INK_FAINT} />
+      </button>
+    </div>
+  );
+}
+
+const inputStyle = {
+  border: `1px solid ${PAPER_LINE}`,
+  background: "#FFFEFB",
+  padding: "10px 12px",
+  fontSize: 14,
+  fontFamily: "ui-monospace, monospace",
+  color: INK,
+  outline: "none",
+  flex: 1,
+};
+
+const addBtnStyle = {
+  background: INK,
+  color: PAPER,
+  border: "none",
+  width: 42,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 13,
+};
+
+const checkBtnStyle = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: 0,
+  display: "flex",
+  alignItems: "center",
+};
+
+const toggleBtnStyle = {
+  flex: 1,
+  border: "none",
+  padding: "9px 0",
+  cursor: "pointer",
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 12,
+  letterSpacing: "0.04em",
+  transition: "background 0.15s",
+};
+
+const TABS = [
+  { key: "tasks", label: "Tasks", icon: ListChecks },
+  { key: "notes", label: "Notes", icon: StickyNote },
+  { key: "budget", label: "Budget", icon: Wallet },
+  { key: "clothes", label: "Clothes", icon: Shirt },
+];
+
+export default function App() {
+  const { data, status, persist } = useLedgerData();
+  const [tab, setTab] = useState("tasks");
+
+  const setTasks = (tasks) => persist({ ...data, tasks });
+  const setNotes = (notes) => persist({ ...data, notes });
+  const setBudget = (budget) => persist({ ...data, budget });
+  const setClothes = (clothes) => persist({ ...data, clothes });
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: PAPER,
+        backgroundImage:
+          "repeating-linear-gradient(180deg, transparent, transparent 27px, rgba(42,38,32,0.035) 28px)",
+        display: "flex",
+        justifyContent: "center",
+        padding: "24px 14px 60px",
+        fontFamily: "Georgia, serif",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 480, position: "relative" }}>
+        <Stamp />
+        <div style={{ marginBottom: 6, paddingTop: 4 }}>
+          <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 11, letterSpacing: "0.15em", color: GREEN_DIM, marginBottom: 4 }}>
+            PERSONAL LEDGER
+          </div>
+          <h1 style={{ fontSize: 30, margin: 0, color: INK, fontWeight: "normal", letterSpacing: "-0.01em" }}>
+            {TABS.find((t) => t.key === tab).label}
+          </h1>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: `2px solid ${INK}`, paddingBottom: 10 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            {TABS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  border: "none",
+                  background: tab === key ? INK : "transparent",
+                  color: tab === key ? PAPER : INK_FAINT,
+                  padding: "7px 12px",
+                  cursor: "pointer",
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 12,
+                  letterSpacing: "0.03em",
+                  borderRadius: 2,
+                }}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <SyncDot status={status} />
+        </div>
+
+        {status === "loading" ? (
+          <div style={{ color: INK_FAINT, fontStyle: "italic", padding: "40px 4px" }}>Opening the ledger…</div>
+        ) : (
+          <>
+            {tab === "tasks" && <TasksTab tasks={data.tasks} setTasks={setTasks} />}
+            {tab === "notes" && <NotesTab notes={data.notes} setNotes={setNotes} />}
+            {tab === "budget" && <BudgetTab budget={data.budget} setBudget={setBudget} />}
+            {tab === "clothes" && <ClothesTab clothes={data.clothes} setClothes={setClothes} />}
+          </>
+        )}
+
+        <div style={{ marginTop: 32, textAlign: "center", fontFamily: "ui-monospace, monospace", fontSize: 10.5, color: INK_FAINT, letterSpacing: "0.03em" }}>
+          Same ledger, every device you open it on.
+        </div>
+      </div>
+    </div>
+  );
+}
